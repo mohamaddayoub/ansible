@@ -1,0 +1,48 @@
+---
+- name: Install node and npm
+  hosts: ec2
+  become: true
+  tasks:
+    - name: Update yum repo and cashe
+      become: true
+      yum: 
+        update_cache: true
+    - name: Install nodejs and npm
+      become: true
+      yum:
+        name:
+          - nodejs
+          - npm
+        state: present
+
+- name: Deploy app on the server
+  hosts: ec2
+  become: true
+  vars_files:
+    - vars
+  tasks:
+    - name: Unpack the nodejs file
+      unarchive:
+        src: "{{node_file_lcoation}}/nodejs-app-{{version}}.tgz"
+        dest: "{{remote_dest}}"
+
+- name: Intsall dependencies
+  hosts: ec2
+  become: true
+  vars_files:
+    - vars
+  tasks:
+    - name: npm Install
+      npm:
+        path: "{{remote_dest}}/package"
+    - name: Start Application
+      command:
+        chdir: "{{remote_dest}}/package/app"
+        cmd: node server
+      async: 1000
+      poll: 0
+    
+    - name: Ensure App is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug: msg={{app_status.stdout_lines}}
